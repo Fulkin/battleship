@@ -1,0 +1,209 @@
+package battleship;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * @author Fulkin
+ * Created on 09.03.2022
+ */
+
+public class Board {
+
+    private static final int SIZE_BOARD = 10;
+    private static final char FOG_OF_WAR = '~';
+    private static final char SHIP = 'O';
+    private static final char SHIP_HIT = 'X';
+    private static final char MISSED = 'M';
+    private final char[][] gameField;
+    private final char[][] gameFogField;
+    private final Map<Ship, Set<Point>> ships = new HashMap<>();
+
+    public Board() {
+        gameField = new char[SIZE_BOARD][SIZE_BOARD];
+        gameFogField = new char[SIZE_BOARD][SIZE_BOARD];
+        initializeBoard(gameField);
+        initializeBoard(gameFogField);
+    }
+
+    public boolean setShip(String first, String second, Ship ship) {
+        Point firstCoord = getCoordinate(first);
+        Point secondCoord = getCoordinate(second);
+        setSecondCoordLarger(firstCoord, secondCoord);
+        if (!checkPlacement(firstCoord, secondCoord, ship)) {
+            return false;
+        }
+        placeShipOnBoard(firstCoord, secondCoord, ship);
+        printGameField(gameField);
+        return true;
+    }
+
+    public void takeShot(String coordinates) {
+        Point shot = getCoordinate(coordinates);
+        int x = shot.getX();
+        int y = shot.getY();
+        if (x == -1 || y == -1) {
+            System.out.println("Error! You entered the wrong coordinates! Try again:");
+        }
+        if (gameField[x][y] == SHIP || gameField[x][y] == SHIP_HIT) {
+            gameFogField[x][y] = SHIP_HIT;
+            gameField[x][y] = SHIP_HIT;
+            printFogBoard();
+            hitShip(shot);
+        } else {
+            gameFogField[x][y] = MISSED;
+            gameField[x][y] = MISSED;
+            printFogBoard();
+            System.out.println("You missed! Try again:\n");
+        }
+    }
+
+    private void hitShip(Point shot) {
+        ships.values().forEach(points -> points.remove(shot));
+        var iter = ships.keySet().iterator();
+
+        while (iter.hasNext()) {
+            var shipM = iter.next();
+            if (ships.get(shipM).isEmpty()) {
+                iter.remove();
+                if (allShipDestroyed()) {
+                    System.out.println("You sank the last ship. You won. Congratulations!");
+                } else {
+                    System.out.println("You sank a ship! Specify a new target:");
+                }
+                return;
+            }
+        }
+        System.out.println("You hit a ship! Try again:\n");
+    }
+
+    public void printFogBoard() {
+        printGameField(gameFogField);
+    }
+
+    public void printGameField() {
+        printGameField(gameField);
+    }
+
+    public boolean allShipDestroyed() {
+        return ships.isEmpty();
+    }
+
+    private void initializeBoard(char[][] board) {
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[0].length; j++) {
+                board[i][j] = FOG_OF_WAR;
+            }
+        }
+    }
+
+    private void placeShipOnBoard(Point firstPoint, Point secondPoint, Ship ship) {
+        ships.putIfAbsent(ship, new HashSet<>());
+        if (firstPoint.getY() == secondPoint.getY()) {
+            for (int i = firstPoint.getX(); i <= secondPoint.getX(); i++) {
+                gameField[i][firstPoint.getY()] = SHIP;
+                ships.get(ship).add(new Point(i, firstPoint.getY()));
+            }
+        } else {
+            for (int i = firstPoint.getY(); i <= secondPoint.getY(); i++) {
+                gameField[firstPoint.getX()][i] = SHIP;
+                ships.get(ship).add(new Point(firstPoint.getX(), i));
+            }
+        }
+    }
+
+    private Point getCoordinate(String strCoordinate) {
+        int x = strCoordinate.charAt(0) - 65;
+        int y = strCoordinate.charAt(1) - 49;
+        try {
+            if (x > 9) {
+                x = -1;
+            }
+            if (strCoordinate.charAt(2) == '0') {
+                y += 9;
+            } else {
+                y = -1;
+            }
+
+        } catch (StringIndexOutOfBoundsException e) {
+
+        }
+        return new Point(x, y);
+    }
+
+    private void setSecondCoordLarger(Point firstPoint, Point secondPoint) {
+        if (firstPoint.getX() > secondPoint.getX() || firstPoint.getY() > secondPoint.getY()) {
+            Point tempPoint = new Point(firstPoint.getX(), firstPoint.getY());
+            firstPoint.setX(secondPoint.getX());
+            firstPoint.setY(secondPoint.getY());
+
+            secondPoint.setX(tempPoint.getX());
+            secondPoint.setY(tempPoint.getY());
+        }
+    }
+
+    private boolean checkPlacement(Point firstPoint, Point secondPoint, Ship ship) {
+        if (firstPoint.getX() != secondPoint.getX() && firstPoint.getY() != secondPoint.getY()) {
+            System.out.printf("Error! Wrong ship location! Try again:%n");
+            return false;
+        } else if (checkSizeShip(firstPoint, secondPoint, ship)) {
+            System.out.printf("Error! Wrong length of the %s! Try again:%n", ship.getName());
+            return false;
+        } else if (!checkBorders(firstPoint, secondPoint)) {
+            System.out.println("Error! You placed it too close to another one. Try again:");
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkSizeShip(Point firstPoint, Point secondPoint, Ship ship) {
+        return ((secondPoint.getX() - firstPoint.getX() > ship.getSize() - 1)
+                || (secondPoint.getY() - firstPoint.getY() > ship.getSize() - 1)) ||
+                ((secondPoint.getX() - firstPoint.getX() < ship.getSize() - 1)
+                        && (secondPoint.getY() - firstPoint.getY() < ship.getSize() - 1));
+    }
+
+    private boolean checkBorders(Point firstPoint, Point secondPoint) {
+        Point leftUpperCorner = getLeftUpperCornerOfCheckingArea(firstPoint);
+        Point bottomRightCorner = getBottomRightCornerOfCheckingArea(secondPoint);
+        for (int i = leftUpperCorner.getX(); i <= bottomRightCorner.getX(); i++) {
+            for (int j = leftUpperCorner.getY(); j <= bottomRightCorner.getY(); j++) {
+                if (gameField[i][j] != FOG_OF_WAR) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private Point getBottomRightCornerOfCheckingArea(Point point) {
+        int bottomRightCornerX = point.getX() == SIZE_BOARD - 1 ? point.getX() : point.getX() + 1;
+        int bottomRightCornerY = point.getY() == SIZE_BOARD - 1 ? point.getX() : point.getY() + 1;
+        return new Point(bottomRightCornerX, bottomRightCornerY);
+    }
+
+    private Point getLeftUpperCornerOfCheckingArea(Point point) {
+        int leftUpperCornerX = point.getX() == 0 ? 0 : point.getX() - 1;
+        int leftUpperCornerY = point.getY() == 0 ? 0 : point.getY() - 1;
+        return new Point(leftUpperCornerX, leftUpperCornerY);
+    }
+
+    public void printGameField(char[][] board) {
+        char letters = 'A';
+        System.out.println("  1 2 3 4 5 6 7 8 9 10");
+        for (char[] chars : board) {
+            for (int l = 0; l < board[0].length; l++) {
+                if (l == 0) {
+                    System.out.print(letters++ + " ");
+                }
+                System.out.print(chars[l] + " ");
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
+
+
+}
