@@ -13,19 +13,25 @@ import java.util.Set;
 public class Board {
 
     private static final int SIZE_BOARD = 10;
-    private static final char FOG_OF_WAR = '~';
-    private static final char SHIP = 'O';
-    private static final char SHIP_HIT = 'X';
-    private static final char MISSED = 'M';
-    private final char[][] gameField;
-    private final char[][] gameFogField;
+    private static final char CELL_FOG_OF_WAR = '~';
+    private static final char CELL_SHIP = 'O';
+    private static final char CELL_SHIP_HIT = 'X';
+    private static final char CELL_MISSED = 'M';
+    private final char[][] ownField;
+    private final char[][] enemyField;
     private final Map<Ship, Set<Point>> ships = new HashMap<>();
 
     public Board() {
-        gameField = new char[SIZE_BOARD][SIZE_BOARD];
-        gameFogField = new char[SIZE_BOARD][SIZE_BOARD];
-        initializeBoard(gameField);
-        initializeBoard(gameFogField);
+        ownField = new char[SIZE_BOARD][SIZE_BOARD];
+        enemyField = new char[SIZE_BOARD][SIZE_BOARD];
+        initializeBoard(ownField);
+        initializeBoard(enemyField);
+    }
+
+    public void printAllFields() {
+        printField(enemyField);
+        System.out.println("---------------------");
+        printField(ownField);
     }
 
     public boolean setShip(String first, String second, Ship ship) {
@@ -36,39 +42,37 @@ public class Board {
             return false;
         }
         placeShipOnBoard(firstCoord, secondCoord, ship);
-        printGameField(gameField);
+        printField(ownField);
         return true;
     }
 
-    public void takeShot(String coordinates) {
+    public void takeShot(Board enemyBoard, String coordinates) {
         Point shot = getCoordinate(coordinates);
         int x = shot.getX();
         int y = shot.getY();
         if (x == -1 || y == -1) {
             System.out.println("Error! You entered the wrong coordinates! Try again:");
         }
-        if (gameField[x][y] == SHIP || gameField[x][y] == SHIP_HIT) {
-            gameFogField[x][y] = SHIP_HIT;
-            gameField[x][y] = SHIP_HIT;
-            printFogBoard();
-            hitShip(shot);
+        if (enemyBoard.ownField[x][y] == CELL_SHIP || enemyBoard.ownField[x][y] == CELL_SHIP_HIT) {
+            enemyBoard.ownField[x][y] = CELL_SHIP_HIT;
+            enemyField[x][y] = CELL_SHIP_HIT;
+            hitShip(shot,enemyBoard);
         } else {
-            gameFogField[x][y] = MISSED;
-            gameField[x][y] = MISSED;
-            printFogBoard();
-            System.out.println("You missed! Try again:\n");
+            enemyBoard.ownField[x][y] = CELL_MISSED;
+            enemyField[x][y] = CELL_MISSED;
+            System.out.println("You missed!\n");
         }
     }
 
-    private void hitShip(Point shot) {
-        ships.values().forEach(points -> points.remove(shot));
-        var iter = ships.keySet().iterator();
+    private void hitShip(Point shot , Board enemyBoard) {
+        enemyBoard.ships.values().forEach(points -> points.remove(shot));
+        var iter = enemyBoard.ships.keySet().iterator();
 
         while (iter.hasNext()) {
             var shipM = iter.next();
-            if (ships.get(shipM).isEmpty()) {
+            if (enemyBoard.ships.get(shipM).isEmpty()) {
                 iter.remove();
-                if (allShipDestroyed()) {
+                if (allShipsDestroyed()) {
                     System.out.println("You sank the last ship. You won. Congratulations!");
                 } else {
                     System.out.println("You sank a ship! Specify a new target:");
@@ -76,25 +80,25 @@ public class Board {
                 return;
             }
         }
-        System.out.println("You hit a ship! Try again:\n");
+        System.out.println("You hit a ship!\n");
     }
 
-    public void printFogBoard() {
-        printGameField(gameFogField);
+    public void printEnemyBoard() {
+        printField(enemyField);
     }
 
-    public void printGameField() {
-        printGameField(gameField);
+    public void printOwnField() {
+        printField(ownField);
     }
 
-    public boolean allShipDestroyed() {
+    public boolean allShipsDestroyed() {
         return ships.isEmpty();
     }
 
     private void initializeBoard(char[][] board) {
         for (int i = 0; i < board.length; i++) {
             for (int j = 0; j < board[0].length; j++) {
-                board[i][j] = FOG_OF_WAR;
+                board[i][j] = CELL_FOG_OF_WAR;
             }
         }
     }
@@ -103,12 +107,12 @@ public class Board {
         ships.putIfAbsent(ship, new HashSet<>());
         if (firstPoint.getY() == secondPoint.getY()) {
             for (int i = firstPoint.getX(); i <= secondPoint.getX(); i++) {
-                gameField[i][firstPoint.getY()] = SHIP;
+                ownField[i][firstPoint.getY()] = CELL_SHIP;
                 ships.get(ship).add(new Point(i, firstPoint.getY()));
             }
         } else {
             for (int i = firstPoint.getY(); i <= secondPoint.getY(); i++) {
-                gameField[firstPoint.getX()][i] = SHIP;
+                ownField[firstPoint.getX()][i] = CELL_SHIP;
                 ships.get(ship).add(new Point(firstPoint.getX(), i));
             }
         }
@@ -170,7 +174,7 @@ public class Board {
         Point bottomRightCorner = getBottomRightCornerOfCheckingArea(secondPoint);
         for (int i = leftUpperCorner.getX(); i <= bottomRightCorner.getX(); i++) {
             for (int j = leftUpperCorner.getY(); j <= bottomRightCorner.getY(); j++) {
-                if (gameField[i][j] != FOG_OF_WAR) {
+                if (ownField[i][j] != CELL_FOG_OF_WAR) {
                     return false;
                 }
             }
@@ -190,7 +194,7 @@ public class Board {
         return new Point(leftUpperCornerX, leftUpperCornerY);
     }
 
-    public void printGameField(char[][] board) {
+    private void printField(char[][] board) {
         char letters = 'A';
         System.out.println("  1 2 3 4 5 6 7 8 9 10");
         for (char[] chars : board) {
@@ -204,6 +208,4 @@ public class Board {
         }
         System.out.println();
     }
-
-
 }
